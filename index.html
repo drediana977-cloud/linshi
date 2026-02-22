@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>任务管理器 + 计时 + 科学计算 + 维多利亚城</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 40px 20px 120px;
+        }
+        .container { width: 100%; max-width: 900px; }
+        .header { text-align: center; margin-bottom: 20px; color: white; }
+        .header h1 { font-size: 2.3rem; font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .header p { font-size: 1rem; opacity: 0.85; margin-top: 8px; }
+
+        .layout { display: grid; grid-template-columns: 2fr 1.2fr; gap: 20px; }
+        @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        }
+
+        /* 任务管理器 */
+        .input-group { display: flex; gap: 12px; margin-bottom: 18px; }
+        .input-group input {
+            flex: 1; padding: 12px 16px; border: 2px solid #e8e8e8;
+            border-radius: 12px; font-size: 1rem; outline: none;
+            transition: border-color 0.3s; color: #333;
+        }
+        .input-group input:focus { border-color: #667eea; }
+        .btn-add {
+            padding: 12px 18px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white; border: none; border-radius: 12px;
+            font-size: 1.4rem; cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(102,126,234,0.4);
+        }
+        .btn-add:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(102,126,234,0.5); }
+
+        .stats { display: flex; gap: 10px; margin-bottom: 14px; }
+        .stat { flex: 1; text-align: center; padding: 10px; background: #f8f9ff; border-radius: 12px; }
+        .stat-number { font-size: 1.5rem; font-weight: 700; color: #667eea; }
+        .stat-label { font-size: 0.75rem; color: #999; margin-top: 2px; }
+
+        .filters { display: flex; gap: 8px; margin-bottom: 14px; }
+        .filter-btn {
+            flex: 1; padding: 8px; border: 2px solid #e8e8e8; border-radius: 10px;
+            background: transparent; font-size: 0.85rem; cursor: pointer;
+            transition: all 0.3s; color: #666; font-weight: 500;
+        }
+        .filter-btn.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-color: transparent; color: white;
+        }
+
+        .task-list { list-style: none; }
+        .task-item {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            grid-template-rows: auto auto;
+            grid-column-gap: 10px; grid-row-gap: 4px;
+            padding: 10px 12px; border-radius: 12px;
+            margin-bottom: 8px; background: #f8f9ff;
+            transition: all 0.3s; animation: slideIn 0.3s ease; align-items: center;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .task-item.completed { opacity: 0.6; }
+
+        .task-checkbox {
+            width: 20px; height: 20px; border: 2px solid #ccc;
+            border-radius: 50%; cursor: pointer; display: flex;
+            align-items: center; justify-content: center; flex-shrink: 0;
+            transition: all 0.3s; grid-row: 1 / span 2;
+        }
+        .task-item.completed .task-checkbox {
+            background: linear-gradient(135deg, #667eea, #764ba2); border-color: transparent;
+        }
+        .task-item.completed .task-checkbox::after {
+            content: '✓'; color: white; font-size: 12px; font-weight: bold;
+        }
+
+        .task-text { font-size: 0.95rem; color: #333; word-break: break-word; }
+        .task-item.completed .task-text { text-decoration: line-through; color: #999; }
+
+        .task-meta { display: flex; align-items: center; gap: 10px; font-size: 0.75rem; color: #999; }
+        .task-time { white-space: nowrap; }
+
+        .btn-delete {
+            background: none; border: none; cursor: pointer; font-size: 1.1rem;
+            opacity: 0; transition: opacity 0.3s; color: #ff6b6b;
+            padding: 4px; grid-row: 1 / span 2;
+        }
+        .task-item:hover .btn-delete { opacity: 1; }
+
+        .task-timer { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; color: #667eea; }
+        .task-timer button {
+            border-radius: 20px; border: none; padding: 3px 8px;
+            font-size: 0.72rem; cursor: pointer;
+            background: #e0e4ff; color: #4b5bd5;
+        }
+
+        .empty-state { text-align: center; padding: 24px 10px; color: #bbb; }
+        .empty-state .icon { font-size: 2.2rem; margin-bottom: 8px; }
+
+        .clear-btn {
+            width: 100%; margin-top: 10px; padding: 10px;
+            background: none; border: 2px dashed #e8e8e8;
+            border-radius: 12px; cursor: pointer; color: #bbb;
+            font-size: 0.85rem; transition: all 0.3s;
+        }
+        .clear-btn:hover { border-color: #ff6b6b; color: #ff6b6b; }
+
+        /* 通用计时器 */
+        .timer-section h3 { font-size: 1rem; margin-bottom: 6px; color: #333; }
+        .timer-display { font-size: 1.4rem; font-weight: 600; color: #667eea; margin-bottom: 8px; }
+        .timer-controls { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+        .timer-controls button {
+            flex: 1; min-width: 70px; padding: 6px 8px; border-radius: 8px;
+            border: none; cursor: pointer; font-size: 0.8rem;
+            background: #f3f4ff; color: #4b5bd5;
+        }
+        .timer-controls button.danger { background: #ffe5e5; color: #e35151; }
+        .countdown-input {
+            width: 100%; padding: 6px 8px; border-radius: 8px;
+            border: 1px solid #e0e0e0; font-size: 0.85rem; margin-bottom: 6px;
+        }
+
+        /* 科学计算器 */
+        .calc { margin-top: 14px; }
+        .calc-title { font-size: 1rem; margin-bottom: 6px; color: #333; }
+        .calc-display {
+            width: 100%; padding: 8px 10px; border-radius: 10px;
+            border: 1px solid #e0e0e0; margin-bottom: 6px; font-size: 0.9rem;
+        }
+        .calc-small { font-size: 0.7rem; color: #999; margin-bottom: 4px; }
+        .calc-buttons { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+        .calc-buttons button {
+            padding: 8px; font-size: 0.85rem; border-radius: 8px;
+            border: none; cursor: pointer; background: #f4f4ff; color: #333;
+        }
+        .calc-buttons button.op { background: #e2e6ff; color: #4b5bd5; }
+        .calc-buttons button.fn { background: #ffe9d6; color: #cc6b29; }
+        .calc-buttons button.equal { background: #4caf50; color: white; }
+        .calc-buttons button.clear { background: #ff6b6b; color: white; }
+        .calc-history {
+            margin-top: 6px; max-height: 90px; overflow-y: auto;
+            font-size: 0.75rem; border-top: 1px dashed #eee;
+            padding-top: 4px; color: #666;
+        }
+        .calc-history div { margin-bottom: 2px; }
+
+        /* 娱乐入口卡片 */
+        .fun-entry {
+            margin-top: 20px;
+            background: white;
+            border-radius: 20px;
+            padding: 20px 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .fun-entry:hover { transform: translateY(-3px); }
+        .fun-entry-left { display: flex; align-items: center; gap: 14px; }
+        .fun-entry-icon { font-size: 2.2rem; }
+        .fun-entry-text h3 { font-size: 1.1rem; color: #333; margin-bottom: 4px; }
+        .fun-entry-text p { font-size: 0.85rem; color: #999; }
+        .fun-entry-arrow {
+            font-size: 1.5rem; color: #667eea;
+            background: #f0f2ff;
+            border-radius: 50%;
+            width: 40px; height: 40px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .fun-badge {
+            background: linear-gradient(135deg, #ff6b9d, #ff9f7a);
+            color: white;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            padding: 2px 10px;
+            font-weight: 600;
+        }
+
+        /* 子网页 Modal */
+        .subpage-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s;
+        }
+        .subpage-overlay.open { opacity: 1; pointer-events: all; }
+        .subpage {
+            background: white;
+            width: 100%;
+            max-width: 880px;
+            max-height: 90vh;
+            border-radius: 24px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transform: translateY(60px) scale(0.96);
+            transition: transform 0.35s cubic-bezier(.22,1,.36,1);
+            box-shadow: 0 30px 80px rgba(0,0,0,0.3);
+        }
+        .subpage-overlay.open .subpage { transform: translateY(0) scale(1); }
+
+        .subpage-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #ff6b9d, #ff9f7a);
+            color: white;
+        }
+        .back-btn {
+            background: rgba(255,255,255,0.25);
+            border: none; border-radius: 20px;
+            color: white; font-size: 0.85rem;
+            padding: 6px 14px; cursor: pointer;
+        }
+        .subpage-title { font-size: 1.1rem; font-weight: 700; flex: 1; }
+
+        .subpage-tabs {
+            display: flex;
+            gap: 6px;
+            margin-left: auto;
+        }
+        .subpage-tab {
+            border: none;
+            border-radius: 20px;
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            background: rgba(255,255,255,0.25);
+            color: white;
+        }
+        .subpage-tab.active {
+            background: rgba(255,255,255,0.95);
+            color: #ff6b9d;
+        }
+
+        .subpage-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+            background: #f7f4f0;
+        }
+
+        /* 趣味测评内部 */
+        .game-intro {
+            text-align: center;
+            padding: 10px 0 20px;
+        }
+        .big-emoji { font-size: 3.5rem; margin-bottom: 14px; }
+        .game-intro h2 { font-size: 1.4rem; color: #333; margin-bottom: 10px; }
+        .game-intro p { font-size: 0.9rem; color: #777; line-height: 1.6; }
+        .start-btn {
+            margin-top: 20px; padding: 12px 40px;
+            border-radius: 50px; border: none;
+            background: linear-gradient(135deg, #ff6b9d, #ff9f7a);
+            color: white; font-size: 1rem; font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 6px 20px rgba(255,107,157,0.35);
+        }
+
+        .quiz-area { display: none; }
+        .progress-bar-wrap {
+            height: 6px; background: #f0f0f0;
+            border-radius: 20px; margin-bottom: 20px;
+        }
+        .progress-bar {
+            height: 6px; border-radius: 20px;
+            background: linear-gradient(90deg, #ff6b9d, #ff9f7a);
+            transition: width 0.5s;
+        }
+        .question-num { font-size: 0.82rem; color: #aaa; margin-bottom: 6px; }
+        .question-text { font-size: 1.1rem; color: #333; font-weight: 600; margin-bottom: 18px; line-height: 1.6; }
+        .options { display: flex; flex-direction: column; gap: 10px; }
+        .opt-btn {
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: 2px solid #e8e8e8;
+            background: white;
+            text-align: left;
+            font-size: 0.95rem;
+            color: #444;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .opt-btn:hover {
+            border-color: #ff9f7a;
+            background: #fff7f3;
+            color: #cc5b1a;
+        }
+
+        .result-area {
+            display: none;
+            text-align: center;
+            padding: 10px 0;
+        }
+        .result-emoji { font-size: 3.5rem; margin-bottom: 12px; }
+        .result-title { font-size: 1.2rem; color: #444; margin-bottom: 6px; font-weight: 700; }
+        .result-size {
+            font-size: 3rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, #ff6b9d, #ff9f7a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 10px 0;
+        }
+        .result-level {
+            display: inline-block;
+            padding: 6px 20px;
+            border-radius: 30px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            margin-bottom: 14px;
+        }
+        .result-comment { font-size: 0.95rem; color: #666; line-height: 1.7; margin-bottom: 20px; }
+        .formula-block {
+            background: #f8f9ff;
+            border-radius: 12px;
+            padding: 12px;
+            font-size: 0.78rem;
+            color: #888;
+            text-align: left;
+            margin-bottom: 18px;
+            line-height: 1.8;
+        }
+        .retry-btn {
+            padding: 10px 30px;
+            border-radius: 50px;
+            border: none;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        /* 维多利亚城市模拟模块 */
+        .city-wrapper {
+            background: #fff;
+            border-radius: 18px;
+            padding: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+        }
+        .city-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .city-header h2 { font-size: 1.1rem; color: #333; }
+        .city-era {
+            font-size: 0.8rem;
+            color: #999;
+        }
+        .city-stats {
+            display: grid;
+            grid-template-columns: repeat(4,1fr);
+            gap: 8px;
+            margin: 6px 0 6px;
+            font-size: 0.8rem;
+            color: #555;
+        }
+        .city-stat {
+            background: #f8f5f0;
+            border-radius: 10px;
+            padding: 6px 8px;
+            text-align: center;
+        }
+        .city-stat span { display: block; }
+        .city-stat .label { font-size: 0.75rem; color: #999; }
+        .city-stat .value { font-weight: 700; }
+
+        .city-bars {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .city-bar {
+            font-size: 0.8rem;
+        }
+        .city-bar-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 3px;
+            color: #555;
+        }
+        .city-bar-track {
+            height: 6px;
+            background: #eee;
+            border-radius: 20px;
+            overflow: hidden;
+        }
+        .city-bar-fill {
+            height: 6px;
+            border-radius: 20px;
+            background: linear-gradient(90deg,#667eea,#31c6ff);
+            width: 50%;
+            transition: width 0.25s;
+        }
+        .city-bar-fill.red { background: linear-gradient(90deg,#ff6b6b,#ffa26f); }
+        .city-bar-fill.green { background: linear-gradient(90deg,#2ecc71,#a3e635); }
+
+        .city-actions-title {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #444;
+        }
+        .city-actions {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 6px;
+        }
+        .city-btn {
+            padding: 8px 6px;
+            border-radius: 10px;
+            border: none;
+            font-size: 0.75rem;
+            cursor: pointer;
+            background: #eef2ff;
+            color: #3949ab;
+        }
+        .city-btn.red { background: #ffebee; color: #c62828; }
+        .city-btn.green { background: #e8f5e9; color: #2e7d32; }
+        .city-btn[disabled] {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .city-year {
+            font-size: 0.8rem;
+            color: #999;
+            margin-top: 6px;
+            text-align: right;
+        }
+        .city-log {
+            margin-top: 8px;
+            max-height: 160px;
+            overflow-y: auto;
+            font-size: 0.78rem;
+            background: #fdfaf5;
+            border-radius: 10px;
+            padding: 8px;
+            border: 1px dashed #e6d9c5;
+        }
+        .city-log-entry { margin-bottom: 4px; }
+
+        .city-note {
+            margin-top: 8px;
+            font-size: 0.78rem;
+            color: #777;
+            line-height: 1.7;
+        }
+        .city-note span {
+            color: #c62828;
+            font-weight: 600;
+        }
+
+        .city-ending {
+            margin-top: 12px;
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            background: #fff3e0;
+            color: #5d4037;
+            display: none;
+        }
+
+        .footer-tip {
+            position: fixed;
+            bottom: 8px; left: 50%;
+            transform: translateX(-50%);
+            color: #f5f5f5; font-size: 0.75rem; opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>✅ 任务管理器 · 计时 · 科学计算</h1>
+        <p>白天是高效任务管理，夜里悄悄穿越到维多利亚时代，当一回市长。</p>
+    </div>
+
+    <div class="layout">
+        <!-- 左：任务管理器 -->
+        <div class="card">
+            <div class="input-group">
+                <input type="text" id="taskInput" placeholder="添加新任务，按 Enter 或点击 ＋" maxlength="100" />
+                <button class="btn-add" onclick="addTask()">＋</button>
+            </div>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-number" id="totalCount">0</div>
+                    <div class="stat-label">全部</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number" id="activeCount">0</div>
+                    <div class="stat-label">进行中</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number" id="completedCount">0</div>
+                    <div class="stat-label">已完成</div>
+                </div>
+            </div>
+            <div class="filters">
+                <button class="filter-btn active" onclick="setFilter('all', this)">全部</button>
+                <button class="filter-btn" onclick="setFilter('active', this)">进行中</button>
+                <button class="filter-btn" onclick="setFilter('completed', this)">已完成</button>
+            </div>
+            <ul class="task-list" id="taskList"></ul>
+            <button class="clear-btn" onclick="clearCompleted()">🗑 清除已完成任务</button>
+        </div>
+
+        <!-- 右：计时器 + 计算器 -->
+        <div class="card">
+            <div class="timer-section">
+                <h3>⏱ 通用秒表</h3>
+                <div class="timer-display" id="stopwatchDisplay">00:00:00</div>
+                <div class="timer-controls">
+                    <button onclick="startStopwatch()">开始 / 继续</button>
+                    <button onclick="pauseStopwatch()">暂停</button>
+                    <button class="danger" onclick="resetStopwatch()">重置</button>
+                </div>
+            </div>
+            <div class="timer-section" style="margin-top:12px;">
+                <h3>⏳ 简单倒计时</h3>
+                <input type="number" id="countdownInput" class="countdown-input" placeholder="输入倒计时秒数，例如 150" />
+                <div class="timer-display" id="countdownDisplay">00:00</div>
+                <div class="timer-controls">
+                    <button onclick="startCountdown()">开始 / 继续</button>
+                    <button onclick="pauseCountdown()">暂停</button>
+                    <button class="danger" onclick="resetCountdown()">重置</button>
+                </div>
+            </div>
+            <div class="calc">
+                <div class="calc-title">🧮 科学计算器</div>
+                <div class="calc-small">支持：分数 (1/3+2/5)、幂 ^、sqrt、sin、cos、tan、ln、log10</div>
+                <input id="calcInput" class="calc-display" placeholder="输入表达式，如 (1/2+2/3)^2" />
+                <input id="calcResult" class="calc-display" placeholder="结果" readonly />
+                <div class="calc-buttons">
+                    <button onclick="appendCalc('7')">7</button>
+                    <button onclick="appendCalc('8')">8</button>
+                    <button onclick="appendCalc('9')">9</button>
+                    <button class="op" onclick="appendCalc('/')">/</button>
+                    <button class="clear" onclick="clearCalc()">C</button>
+
+                    <button onclick="appendCalc('4')">4</button>
+                    <button onclick="appendCalc('5')">5</button>
+                    <button onclick="appendCalc('6')">6</button>
+                    <button class="op" onclick="appendCalc('*')">×</button>
+                    <button class="op" onclick="appendCalc('^')">^</button>
+
+                    <button onclick="appendCalc('1')">1</button>
+                    <button onclick="appendCalc('2')">2</button>
+                    <button onclick="appendCalc('3')">3</button>
+                    <button class="op" onclick="appendCalc('-')">-</button>
+                    <button class="fn" onclick="appendCalc('sqrt(')">√</button>
+
+                    <button onclick="appendCalc('0')">0</button>
+                    <button onclick="appendCalc('.')">.</button>
+                    <button onclick="appendCalc('(')">(</button>
+                    <button onclick="appendCalc(')')">)</button>
+                    <button class="equal" onclick="calcEqual()">=</button>
+
+                    <button class="fn" onclick="appendCalc('sin(')">sin</button>
+                    <button class="fn" onclick="appendCalc('cos(')">cos</button>
+                    <button class="fn" onclick="appendCalc('tan(')">tan</button>
+                    <button class="fn" onclick="appendCalc('ln(')">ln</button>
+                    <button class="fn" onclick="appendCalc('log10(')">log10</button>
+                </div>
+                <div class="calc-history" id="calcHistory"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 娱乐入口卡片 -->
+    <div class="fun-entry" onclick="openFunPage()">
+        <div class="fun-entry-left">
+            <div class="fun-entry-icon">🎮</div>
+            <div class="fun-entry-text">
+                <h3>娱乐消遣 · 趣味测试 + 维多利亚市长 <span class="fun-badge">NEW</span></h3>
+                <p>做一个略不正经的测评，再试着把一座工业城市带到 1901 年，看你走向哪种结局。</p>
+            </div>
+        </div>
+        <div class="fun-entry-arrow">→</div>
+    </div>
+</div>
+    <!-- Jack 语录入口：独立全屏子页面 -->
+    <a href="jack.html" style="text-decoration:none;">
+        <div class="fun-entry" style="margin-top:16px; background: linear-gradient(135deg,#1e1207,#2c1005); border:1px solid rgba(201,162,39,0.3);">
+            <div class="fun-entry-left">
+                <div class="fun-entry-icon">⭐</div>
+                <div class="fun-entry-text">
+                    <h3 style="color:#c9a227;">Jack 语录 · 心系群众，坦荡见己</h3>
+                    <p style="color:rgba(201,162,39,0.55);">点击进入独立全屏页面 · 原创改编语录 · 从群众中来，到群众中去</p>
+                </div>
+            </div>
+            <div class="fun-entry-arrow" style="background:rgba(201,162,39,0.15);color:#c9a227;">→</div>
+        </div>
+    </a>
+
+<!-- 子网页 Modal -->
+<div class="subpage-overlay" id="subpageOverlay">
+    <div class="subpage">
+        <div class="subpage-header">
+            <button class="back-btn" onclick="closeFunPage()">← 返回</button>
+            <div class="subpage-title">🎮 趣味测评 & 维多利亚城</div>
+            <div class="subpage-tabs">
+                <button class="subpage-tab active" id="tabQuiz" onclick="switchSubTab('quiz')">趣味测试</button>
+                <button class="subpage-tab" id="tabCity" onclick="switchSubTab('city')">维多利亚市长模拟</button>
+            </div>
+        </div>
+        <div class="subpage-body">
+            <!-- Tab 1: 趣味测评 -->
+            <div id="subTabQuiz">
+                <div class="game-intro" id="gameIntro">
+                    <div class="big-emoji">🔬</div>
+                    <h2>科学趣味测评</h2>
+                    <p>共 <strong>10</strong> 道选择题，纯娱乐向。<br>
+                       结果通过一个虚构的「尺寸指数算法」给出，不具有任何现实含义。</p>
+                    <button class="start-btn" onclick="startGame()">开始测评 🚀</button>
+                </div>
+                <div class="quiz-area" id="quizArea">
+                    <div class="progress-bar-wrap">
+                        <div class="progress-bar" id="progressBar" style="width:0%"></div>
+                    </div>
+                    <div class="question-num" id="questionNum">第 1 / 10 题</div>
+                    <div class="question-text" id="questionText"></div>
+                    <div class="options" id="optionsArea"></div>
+                </div>
+                <div class="result-area" id="resultArea">
+                    <div class="result-emoji" id="resultEmoji">🏆</div>
+                    <div class="result-title">测评完成！您的专属结果是：</div>
+                    <div class="result-size" id="resultSize">-- cm</div>
+                    <div class="result-level" id="resultLevel"></div>
+                    <div class="result-comment" id="resultComment"></div>
+                    <div class="formula-block" id="formulaBlock"></div>
+                    <button class="retry-btn" onclick="retryGame()">🔄 再测一次</button>
+                </div>
+            </div>
+
+            <!-- Tab 2: 维多利亚城市模拟（多结局） -->
+            <div id="subTabCity" style="display:none;">
+                <div class="city-wrapper">
+                    <div class="city-header">
+                        <h2>🏙 维多利亚城 · 多结局市长模拟</h2>
+                        <div class="city-era">约 1837 - 1901 · 工业革命与工人运动并行的时代[web:69]</div>
+                    </div>
+
+                    <div class="city-stats">
+                        <div class="city-stat">
+                            <span class="label">人口</span>
+                            <span class="value" id="cityPopulation">8000</span>
+                        </div>
+                        <div class="city-stat">
+                            <span class="label">工业产出</span>
+                            <span class="value" id="cityIndustry">10</span>
+                        </div>
+                        <div class="city-stat">
+                            <span class="label">市政财政 (£)</span>
+                            <span class="value" id="cityTreasury">2000</span>
+                        </div>
+                        <div class="city-stat">
+                            <span class="label">年份</span>
+                            <span class="value" id="cityYear">1837</span>
+                        </div>
+                    </div>
+
+                    <div class="city-bars">
+                        <div class="city-bar">
+                            <div class="city-bar-label">
+                                <span>工人阶级满意度</span>
+                                <span id="cityHappinessText">55 / 100</span>
+                            </div>
+                            <div class="city-bar-track">
+                                <div class="city-bar-fill green" id="cityHappinessBar" style="width:55%"></div>
+                            </div>
+                        </div>
+                        <div class="city-bar">
+                            <div class="city-bar-label">
+                                <span>工作条件 / 安全</span>
+                                <span id="citySafetyText">40 / 100</span>
+                            </div>
+                            <div class="city-bar-track">
+                                <div class="city-bar-fill red" id="citySafetyBar" style="width:40%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="city-actions-title">城市决策（每次决策推进时间并可能触发历史事件）</div>
+                    <div class="city-actions">
+                        <button class="city-btn" id="btnFactory" onclick="buildFactory()">建设纺织工厂</button>
+                        <button class="city-btn" onclick="expandRailway()">修建铁路</button>
+                        <button class="city-btn green" id="btnTenHours" onclick="passTenHoursAct()">通过十小时工厂法</button>
+                        <button class="city-btn green" onclick="improveSanitation()">改善卫生与住房</button>
+                        <button class="city-btn red" onclick="strictPoorLaw()">严格执行济贫法</button>
+                        <button class="city-btn green" onclick="supportWorkersEdu()">赞助工人夜校与读书会</button>
+                    </div>
+
+                    <div class="city-year" id="cityYearDesc"></div>
+                    <div class="city-log" id="cityLog"></div>
+
+                    <div class="city-ending" id="cityEnding"></div>
+
+                    <div class="city-note">
+                        说明：这里的事件和倾向参考了维多利亚时期的铁路扩张、工厂法、济贫法争议以及早期工人罢工、工人教育与社会主义/共产主义思潮的萌芽，但被压缩成轻量级玩法。[web:63][web:69][web:78]
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="footer-tip">提示：点击“娱乐消遣”卡片，打开测评和维多利亚多结局城市模拟。</div>
+
+<script>
+/* ========= 任务 & 计时 ========= */
+let tasks = JSON.parse(localStorage.getItem('tasks_v2')) || [];
+let currentFilter = 'all';
+let taskTimerIntervals = {};
+
+function saveTasks(){ localStorage.setItem('tasks_v2', JSON.stringify(tasks)); }
+
+function addTask(){
+    const input = document.getElementById('taskInput');
+    const text = input.value.trim();
+    if(!text) return;
+    const now = new Date();
+    const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+    tasks.unshift({ id: Date.now(), text, completed:false, time:timeStr, spentSeconds:0, running:false });
+    input.value=''; saveTasks(); renderTasks();
+}
+function toggleTask(id){
+    const t = tasks.find(x=>x.id===id);
+    if(t){ t.completed=!t.completed; saveTasks(); renderTasks(); }
+}
+function deleteTask(id){
+    stopTaskTimer(id,true);
+    tasks = tasks.filter(t=>t.id!==id);
+    saveTasks(); renderTasks();
+}
+function clearCompleted(){
+    tasks.forEach(t=>{ if(t.completed) stopTaskTimer(t.id,true); });
+    tasks = tasks.filter(t=>!t.completed);
+    saveTasks(); renderTasks();
+}
+function setFilter(f,btn){
+    currentFilter=f;
+    document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTasks();
+}
+function escapeHtml(text){ const d=document.createElement('div'); d.appendChild(document.createTextNode(text)); return d.innerHTML; }
+function formatHMS(s){
+    return String(Math.floor(s/3600)).padStart(2,'0') + ':' +
+           String(Math.floor((s%3600)/60)).padStart(2,'0') + ':' +
+           String(s%60).padStart(2,'0');
+}
+function renderTasks(){
+    const total=tasks.length;
+    const completed=tasks.filter(t=>t.completed).length;
+    document.getElementById('totalCount').textContent=total;
+    document.getElementById('activeCount').textContent=total-completed;
+    document.getElementById('completedCount').textContent=completed;
+    let filtered=tasks;
+    if(currentFilter==='active') filtered=tasks.filter(t=>!t.completed);
+    if(currentFilter==='completed') filtered=tasks.filter(t=>t.completed);
+    const list=document.getElementById('taskList');
+    if(!filtered.length){
+        list.innerHTML=`<div class="empty-state"><div class="icon">📋</div><p>暂无任务</p></div>`;
+        return;
+    }
+    list.innerHTML=filtered.map(task=>`
+      <li class="task-item ${task.completed?'completed':''}">
+        <div class="task-checkbox" onclick="toggleTask(${task.id})"></div>
+        <div class="task-text">${escapeHtml(task.text)}</div>
+        <button class="btn-delete" onclick="deleteTask(${task.id})">✕</button>
+        <div class="task-meta">
+            <span class="task-time">创建 ${task.time}</span>
+            <span class="task-timer">
+                ⏱ <span id="taskTimer-${task.id}">${formatHMS(task.spentSeconds||0)}</span>
+                <button onclick="toggleTaskTimer(${task.id})">${task.running?'暂停':'开始'}</button>
+                <button onclick="resetTaskTimer(${task.id})">重置</button>
+            </span>
+        </div>
+      </li>
+    `).join('');
+}
+function toggleTaskTimer(id){
+    const t=tasks.find(x=>x.id===id);
+    if(!t) return;
+    t.running?stopTaskTimer(id):startTaskTimer(id);
+    saveTasks(); renderTasks();
+}
+function startTaskTimer(id){
+    const t=tasks.find(x=>x.id===id);
+    if(!t) return;
+    if(taskTimerIntervals[id]) clearInterval(taskTimerIntervals[id]);
+    t.running=true;
+    taskTimerIntervals[id]=setInterval(()=>{
+        t.spentSeconds=(t.spentSeconds||0)+1;
+        const el=document.getElementById('taskTimer-'+id);
+        if(el) el.textContent=formatHMS(t.spentSeconds);
+    },1000);
+}
+function stopTaskTimer(id,removeOnly){
+    const t=tasks.find(x=>x.id===id);
+    if(t && !removeOnly) t.running=false;
+    if(taskTimerIntervals[id]){ clearInterval(taskTimerIntervals[id]); delete taskTimerIntervals[id]; }
+}
+function resetTaskTimer(id){
+    const t=tasks.find(x=>x.id===id);
+    if(!t) return;
+    stopTaskTimer(id);
+    t.spentSeconds=0; t.running=false;
+    saveTasks(); renderTasks();
+}
+document.getElementById('taskInput').addEventListener('keydown',e=>{
+    if(e.key==='Enter') addTask();
+});
+
+/* ========= 秒表 ========= */
+let swInterval=null, swSec=0;
+function updateSW(){ document.getElementById('stopwatchDisplay').textContent=formatHMS(swSec); }
+function startStopwatch(){ if(swInterval) clearInterval(swInterval); swInterval=setInterval(()=>{swSec++;updateSW();},1000); }
+function pauseStopwatch(){ if(swInterval){clearInterval(swInterval);swInterval=null;} }
+function resetStopwatch(){ pauseStopwatch(); swSec=0; updateSW(); }
+
+/* ========= 倒计时 ========= */
+let cdInterval=null, cdSec=0;
+function updateCD(){
+    document.getElementById('countdownDisplay').textContent=
+        String(Math.floor(cdSec/60)).padStart(2,'0')+':'+String(cdSec%60).padStart(2,'0');
+}
+function startCountdown(){
+    if(cdSec===0){
+        const v=parseInt(document.getElementById('countdownInput').value,10);
+        if(!isNaN(v)&&v>0) cdSec=v;
+    }
+    if(cdSec<=0) return;
+    if(cdInterval) clearInterval(cdInterval);
+    cdInterval=setInterval(()=>{
+        if(cdSec>0){ cdSec--; updateCD(); }
+        else{ clearInterval(cdInterval); cdInterval=null; alert('⏰ 倒计时结束！'); }
+    },1000);
+}
+function pauseCountdown(){ if(cdInterval){clearInterval(cdInterval);cdInterval=null;} }
+function resetCountdown(){ pauseCountdown(); cdSec=0; updateCD(); }
+
+/* ========= 科学计算器 ========= */
+const calcInputEl=document.getElementById('calcInput');
+const calcResultEl=document.getElementById('calcResult');
+const calcHistoryEl=document.getElementById('calcHistory');
+function appendCalc(s){ calcInputEl.value+=s; calcInputEl.focus(); }
+function clearCalc(){ calcInputEl.value=''; calcResultEl.value=''; }
+function normalizeExpression(expr){
+    expr=expr.replace(/sqrt\(/g,'Math.sqrt(')
+             .replace(/ln\(/g,'Math.log(')
+             .replace(/log10\(/g,'Math.log10(')
+             .replace(/sin\(/g,'Math.sin(')
+             .replace(/cos\(/g,'Math.cos(')
+             .replace(/tan\(/g,'Math.tan(');
+    while(/\^/.test(expr)){
+        expr=expr.replace(/([0-9.]+|\))\s*\^\s*([0-9.]+|\()/,(_,l,r)=>'Math.pow('+l+','+r+')');
+    }
+    return expr;
+}
+function calcEqual(){
+    const raw=calcInputEl.value.trim();
+    if(!raw) return;
+    try{
+        const res=(new Function('return '+normalizeExpression(raw)))();
+        if(typeof res==='number' && !isNaN(res)){
+            calcResultEl.value=Number(res.toFixed(10)).toString();
+            const d=document.createElement('div');
+            d.textContent=raw+' = '+calcResultEl.value;
+            calcHistoryEl.prepend(d);
+        }else{
+            calcResultEl.value='表达式无效';
+        }
+    }catch(e){ calcResultEl.value='错误：'+e.message; }
+}
+calcInputEl.addEventListener('keydown',e=>{ if(e.key==='Enter') calcEqual(); });
+
+/* ========= 子网页 Tab ========= */
+function openFunPage(){
+    document.getElementById('subpageOverlay').classList.add('open');
+    document.body.style.overflow='hidden';
+}
+function closeFunPage(){
+    document.getElementById('subpageOverlay').classList.remove('open');
+    document.body.style.overflow='';
+}
+function switchSubTab(which){
+    const tabQuiz=document.getElementById('tabQuiz');
+    const tabCity=document.getElementById('tabCity');
+    const subQuiz=document.getElementById('subTabQuiz');
+    const subCity=document.getElementById('subTabCity');
+    if(which==='quiz'){
+        tabQuiz.classList.add('active'); tabCity.classList.remove('active');
+        subQuiz.style.display='block'; subCity.style.display='none';
+    }else{
+        tabQuiz.classList.remove('active'); tabCity.classList.add('active');
+        subQuiz.style.display='none'; subCity.style.display='block';
+    }
+}
+
+/* ========= 趣味测评 ========= */
+const QUESTIONS=[
+    {q:'🌅 你平时通常几点起床？',opts:['5点前，我是超级早起鸟','6~7点，规律健康','8~9点，睡到自然醒','10点以后，作息自由'],scores:[4,3,2,1]},
+    {q:'🏋️ 你每周运动几次？',opts:['几乎不运动','偶尔走走，1~2次','固定锻炼 3~4次','每天都练，停不下来'],scores:[1,2,3,4]},
+    {q:'🥩 你最常吃的食物类型是？',opts:['蔬菜水果为主','均衡饮食','爱吃肉类','高蛋白补剂 + 大量肉'],scores:[1,2,3,4]},
+    {q:'💤 你每天平均睡多少小时？',opts:['少于5小时','5~6小时','7~8小时','9小时以上'],scores:[1,2,4,3]},
+    {q:'😤 遇到挫折时，你的第一反应是？',opts:['躺平，等它过去','消极一段时间再恢复','很快调整，继续前进','完全不受影响，越战越勇'],scores:[1,2,3,4]},
+    {q:'🎯 你平时做事的风格是？',opts:['随意，随缘','有大致计划','认真规划每一步','目标导向，精确执行'],scores:[1,2,3,4]},
+    {q:'🧠 你认为自己的学习能力如何？',opts:['学什么都费劲','一般般','比多数人强','过目不忘，天赋异禀'],scores:[1,2,3,4]},
+    {q:'🌍 你最想去旅游的地方是？',opts:['就在家里最好','国内小城市','国内一线城市','全球各地都想去'],scores:[1,2,3,4]},
+    {q:'🎵 你平时听什么类型的音乐？',opts:['轻音乐 / 古典','流行 / 抒情','摇滚 / 说唱','电子 / 金属 / 极端风格'],scores:[2,2,3,4]},
+    {q:'🔥 最后一题：你认为自己的魅力值是？',opts:['还需努力，很一般','中等，凑合','相当不错','魅力爆表，无法抵挡'],scores:[1,2,3,4]}
+];
+let currentQ=0,totalScore=0;
+function startGame(){
+    currentQ=0; totalScore=0;
+    document.getElementById('gameIntro').style.display='none';
+    document.getElementById('resultArea').style.display='none';
+    document.getElementById('quizArea').style.display='block';
+    renderQuestion();
+}
+function renderQuestion(){
+    const q=QUESTIONS[currentQ];
+    document.getElementById('progressBar').style.width=(currentQ/QUESTIONS.length*100)+'%';
+    document.getElementById('questionNum').textContent=`第 ${currentQ+1} / ${QUESTIONS.length} 题`;
+    document.getElementById('questionText').textContent=q.q;
+    const area=document.getElementById('optionsArea');
+    area.innerHTML=q.opts.map((opt,i)=>`<button class="opt-btn" onclick="selectAnswer(${i})">${opt}</button>`).join('');
+}
+function selectAnswer(i){
+    totalScore+=QUESTIONS[currentQ].scores[i];
+    currentQ++;
+    if(currentQ<QUESTIONS.length) renderQuestion();
+    else showResult();
+}
+function showResult(){
+    document.getElementById('quizArea').style.display='none';
+    document.getElementById('progressBar').style.width='100%';
+    const base=8+(totalScore-10)*0.55;
+    const jitter=(Math.random()*1.6-0.8);
+    const raw=base+jitter;
+    const size=Math.max(5,Math.min(25,raw));
+    const display=size.toFixed(1);
+    let emoji,level,levelColor,comment;
+    if(size<10){
+        emoji='🌱'; level='S 级 · 稀有小精灵'; levelColor='#4dc87a';
+        comment='虽然数值偏小，但浓缩的才是精华，小巧也有小巧的优势。';
+    }else if(size<14){
+        emoji='📏'; level='A 级 · 均衡稳健型'; levelColor='#4b9de8';
+        comment='你处在一个相当均衡的位置，稳健、可靠，是很舒服的区间。';
+    }else if(size<18){
+        emoji='🚀'; level='S+ 级 · 实力派代表'; levelColor='#f5a623';
+        comment='表现相当亮眼，在统计意义上已经相当靠前，实力可观。';
+    }else{
+        emoji='👑'; level='SSS 级 · 传说中的存在'; levelColor='#e84393';
+        comment='这个数值已经超出了常规经验范围，只能用“传说级”来形容。';
+    }
+    document.getElementById('resultEmoji').textContent=emoji;
+    document.getElementById('resultSize').textContent=display+' cm';
+    const levelEl=document.getElementById('resultLevel');
+    levelEl.textContent=level;
+    levelEl.style.background=levelColor+'22';
+    levelEl.style.color=levelColor;
+    document.getElementById('resultComment').textContent=comment;
+    document.getElementById('formulaBlock').innerHTML =
+        `<strong>📐 尺寸指数算法（仅供娱乐）</strong><br>
+        总得分 S = ${totalScore} 分（满分 40 分）<br>
+        基础值 = 8 + (S - 10) × 0.55 = ${base.toFixed(2)} cm<br>
+        随机扰动 δ = ${jitter.toFixed(2)} cm（模拟个体差异）<br>
+        最终结果 = clamp(基础值 + δ, 5, 25) = <strong>${display} cm</strong>`;
+    document.getElementById('resultArea').style.display='block';
+}
+function retryGame(){
+    document.getElementById('resultArea').style.display='none';
+    document.getElementById('gameIntro').style.display='block';
+}
+
+/* ========= 维多利亚城市模拟：多结局 =========
+   机制：
+   - 时间：从 1837 前后推进到 1901 左右 [web:69]
+   - 若工人满意 < 25 且安全 < 30，可能触发「大罢工/起义事件」[web:78]
+   - 若财政 < 0 或长期过低，可能被资本寡头接管或财政崩溃
+   - 法案型按钮部分只能执行一次（或有冷却），避免乱刷
+   - 年份 >= 1901 或触发致命事件时给出结局
+========================================= */
+let cityState = {
+    year: 1837,
+    population: 8000,
+    industry: 10,
+    treasury: 2000,
+    happiness: 55,
+    safety: 40,
+    turn: 0,
+    ended: false,
+    endingsChecked: false
+};
+const oncePolicies = {
+    tenHoursAct: false,
+    strictPoorLawCount: 0 // 可多次但有后果
+};
+
+function clamp(v,min,max){ return Math.max(min,Math.min(max,v)); }
+
+function updateCityUI(message) {
+    document.getElementById('cityPopulation').textContent = cityState.population;
+    document.getElementById('cityIndustry').textContent = cityState.industry;
+    document.getElementById('cityTreasury').textContent = cityState.treasury;
+    document.getElementById('cityYear').textContent = cityState.year;
+    document.getElementById('cityHappinessText').textContent = cityState.happiness + ' / 100';
+    document.getElementById('citySafetyText').textContent = cityState.safety + ' / 100';
+    document.getElementById('cityHappinessBar').style.width = cityState.happiness + '%';
+    document.getElementById('citySafetyBar').style.width = cityState.safety + '%';
+
+    document.getElementById('cityYearDesc').textContent =
+        `时间线：约 ${cityState.year} 年 · 工业城市扩张、工人运动与帝国鼎盛并存的年代。`;
+
+    // 禁用已使用的一次性法案
+    if (oncePolicies.tenHoursAct) {
+        const btn = document.getElementById('btnTenHours');
+        btn.disabled = true;
+        btn.textContent = '十小时工厂法（已实施）';
+    }
+
+    const log = document.getElementById('cityLog');
+    if(message){
+        const div=document.createElement('div');
+        div.className='city-log-entry';
+        div.textContent = `【${cityState.year}】` + message;
+        log.prepend(div);
+    }
+}
+
+function logEvent(msg){ updateCityUI(msg); }
+
+/* ---- 时间推进 ＋ 随机事件 ＋ 结局检测 ---- */
+function advanceYears(years){
+    if(cityState.ended) return;
+    cityState.year += years;
+    cityState.turn += 1;
+
+    // 触发随机事件
+    triggerRandomEvents();
+
+    // 每回合自然变化：人口略增长，财政随工业产生波动
+    cityState.population = Math.round(cityState.population * (1 + 0.01 * (0.5 + Math.random())));
+    cityState.treasury += Math.round(cityState.industry * (0.5 + Math.random())); // 稍微产出
+
+    // 限制指标
+    cityState.happiness = clamp(cityState.happiness,0,100);
+    cityState.safety = clamp(cityState.safety,0,100);
+
+    updateCityUI();
+
+    // 年份到 1901 或发生极端状况时检查结局
+    checkEndings();
+}
+
+/* ---- 随机事件系统 ---- */
+function triggerRandomEvents(){
+    // 若已经结束，不再触发
+    if(cityState.ended) return;
+
+    const r = Math.random();
+
+    // 工人不满 & 安全差：高概率触发罢工/暴动
+    if(cityState.happiness < 30 && cityState.safety < 35 && r < 0.45){
+        // 中型罢工事件
+        cityState.industry = Math.max(0, cityState.industry - 4);
+        cityState.treasury -= 300;
+        cityState.happiness += 5; // 通过罢工宣泄，略回升
+        logEvent('工人对长工时和危险环境不满，爆发了罢工。部分工厂停工，你被迫与工人代表谈判。');
+    } else if (cityState.happiness < 25 && cityState.safety < 30 && r < 0.15){
+        // 大起义：直接进入结局
+        cityState.happiness = 0;
+        cityState.safety = 20;
+        logEvent('长期压迫与危险环境最终引发了大规模工人起义，街垒和罢工遍布城市。');
+        endingWorkersRevolution();
+        return;
+    }
+
+    // 卫生差时可能触发疾病
+    if(cityState.safety < 25 && r < 0.25){
+        cityState.population = Math.round(cityState.population * 0.97);
+        cityState.happiness -= 4;
+        logEvent('由于污水与住房条件恶劣，一场霍乱等传染病席卷城区，城市病死亡率上升。');
+    }
+
+    // 铁路与工业高时可能触发铁路事故
+    if(cityState.industry > 25 && r < 0.2){
+        cityState.safety -= 5;
+        cityState.treasury -= 200;
+        logEvent('铁路与工厂货运繁忙，发生了一起铁路事故，引发舆论对安全与监管的批评。');
+    }
+
+    // 工人教育较高且满意度偏低时，出现更多激进思想/小册子
+    if(cityState.happiness < 40 && cityState.safety > 45 && r < 0.2){
+        logEvent('在工人夜校与读书会上，一些涉及平等、公有、工人联合的书被频繁传阅，新的社会思想开始渗透人心。');
+    }
+}
+
+/* ---- 行动按钮逻辑 ---- */
+// 建设工厂：重复可用，但会逐步压低安全和满意度
+function buildFactory() {
+    if(cityState.ended) return;
+    cityState.industry += 8;
+    cityState.treasury += 600;
+    cityState.population += 1200;
+    cityState.happiness -= 4;
+    cityState.safety -= 6;
+    logEvent('你批准建立新的纺织厂和机械厂。利润上升，城市吸引大量农村人口涌入，但加班与事故也随之增加。');
+    advanceYears(2);
+}
+
+// 修建铁路：加强工业与人口流动
+function expandRailway() {
+    if(cityState.ended) return;
+    cityState.industry += 5;
+    cityState.treasury -= 400;
+    cityState.population += 600;
+    cityState.happiness += 2;
+    logEvent('你推动修建铁路，将工厂与港口和矿区连通。贸易与人口流动提升，但财政短期承压。');
+    advanceYears(3);
+}
+
+// 十小时工厂法：一次性法案
+function passTenHoursAct() {
+    if(cityState.ended) return;
+    if(oncePolicies.tenHoursAct){
+        logEvent('十小时工厂法已经通过，无法再次立法。');
+        return;
+    }
+    oncePolicies.tenHoursAct = true;
+    cityState.treasury -= 150;
+    cityState.happiness += 12;
+    cityState.safety += 14;
+    cityState.industry -= 2;
+    logEvent('你通过了类似 1847 年十小时法案的立法，限制妇女与青少年每日工时，工人阶级对你好感大增，部分厂主则抱怨利润受损。');
+    advanceYears(1);
+}
+
+// 卫生与住房
+function improveSanitation() {
+    if(cityState.ended) return;
+    cityState.treasury -= 500;
+    cityState.happiness += 8;
+    cityState.population += 400;
+    cityState.safety += 6;
+    logEvent('你投资下水道、饮用水系统和工人住房。霍乱等流行病得到一定控制，工人家庭的生活质量改善。');
+    advanceYears(2);
+}
+
+// 济贫法：可重复，但每次都会压低满意度并增加动荡风险
+function strictPoorLaw() {
+    if(cityState.ended) return;
+    oncePolicies.strictPoorLawCount += 1;
+    cityState.treasury += 250;
+    cityState.happiness -= (6 + 2*oncePolicies.strictPoorLawCount);
+    cityState.safety -= 2;
+    logEvent('你选择严格执行济贫法，削减救济，迫使贫民进入工厂与救济院。财政缓解，但社会不满和激进舆论明显上升。');
+    advanceYears(1);
+}
+
+// 工人夜校与读书会（社会主义/共产主义萌芽彩蛋）
+function supportWorkersEdu() {
+    if(cityState.ended) return;
+    cityState.treasury -= 120;
+    cityState.happiness += 7;
+    cityState.safety += 3;
+    cityState.industry += 1;
+    logEvent('你资助工人夜校与读书会。一些工人开始阅读关于工人阶级、工会、公有制等著作，讨论「联合起来」「反对赤裸剥削」的思想，在茶馆与小册子中悄然扩散。');
+    advanceYears(2);
+}
+
+/* ---- 结局系统 ---- */
+function checkEndings(){
+    if(cityState.ended) return;
+
+    // 若财政极度崩溃
+    if(cityState.treasury < -1000){
+        endingFiscalCollapse();
+        return;
+    }
+
+    // 工人长期极度不满，且已有多次严苛济贫法
+    if(cityState.happiness <= 10 && oncePolicies.strictPoorLawCount >= 2){
+        endingMobOverthrow();
+        return;
+    }
+
+    // 高工业，但幸福度和安全都极低：被资本寡头控制一切，市长成傀儡
+    if(cityState.industry >= 40 && cityState.happiness < 25 && cityState.safety < 30){
+        endingCapitalOligarchy();
+        return;
+    }
+
+    // 年份到 1901 左右，平稳结束：根据状态给出不同结局
+    if(cityState.year >= 1901 && !cityState.endingsChecked){
+        cityState.endingsChecked = true;
+        // 完美结局条件：工人幸福 >= 65，安全 >= 60，财政 >= 3000，工业 >= 25
+        if(cityState.happiness >= 65 && cityState.safety >= 60 && cityState.treasury >= 3000 && cityState.industry >= 25){
+            endingPerfectMayor();
+        }else if(cityState.happiness >= 45 && cityState.treasury >= 1500){
+            endingOrdinaryTerm();
+        }else if(cityState.happiness >= 55 && cityState.safety >= 55 && cityState.treasury <= 1000){
+            // 工人运动成功、向社会主义/共产主义实验过渡
+            endingWorkersExperiment();
+        }else{
+            endingMediocre();
+        }
+    }
+}
+
+function showEnding(title, body){
+    cityState.ended = true;
+    // 禁用所有按钮
+    document.querySelectorAll('.city-btn').forEach(btn=>btn.disabled=true);
+    const box=document.getElementById('cityEnding');
+    box.style.display='block';
+    box.innerHTML=`<strong>${title}</strong><br>${body}`;
+}
+
+// 结局 1：暴民推翻
+function endingMobOverthrow(){
+    showEnding(
+        '结局：被暴民推翻',
+        '长期的高压济贫法与低福利政策，叠加危险的工厂环境，让愤怒的工人和底层民众最终走上街头。你被困在市政厅，目睹怒火烧毁象征旧秩序的建筑。你作为市长被迫流亡，留下的是一座在烈火中重塑的城市。'
+    );
+}
+
+// 结局 2：财政崩溃
+function endingFiscalCollapse(){
+    showEnding(
+        '结局：财政崩溃，城市破产',
+        '你过度依赖举债与短期行为，财政赤字不断累积，最终城市无法支付债券利息和基础服务支出。伦敦的报纸把你称为“最不负责任的市长之一”，你的政绩被当作警示案例写进了后世的教科书。'
+    );
+}
+
+// 结局 3：资本寡头控制
+function endingCapitalOligarchy(){
+    showEnding(
+        '结局：资本寡头的傀儡',
+        '工业产出节节攀升，但工人生活与安全被严重牺牲。最终，真正掌握城市权力的不是市政厅，而是几家巨型工厂和铁路公司。你仍坐在市长位置，却只能在董事会的暗示与指令之间寻找微弱的“自由裁量空间”。'
+    );
+}
+
+// 结局 4：工人运动成功 / 社会主义实验
+function endingWorkersExperiment(){
+    showEnding(
+        '结局：工人运动成功，新的实验开始',
+        '在你任期内，工会逐渐壮大，工人教育与组织程度提高。随着一系列谈判、罢工和选举改革，本城出现了带有强烈工人自治色彩的新议会，一些关键行业转为公有或合作社运营。历史学家会说，这里曾短暂出现过一种带有社会主义/共产主义理想影子的制度实验。'
+    );
+}
+
+// 结局 5：完美市长，盆满钵满
+function endingPerfectMayor(){
+    showEnding(
+        '结局：完美市长 · 人人称颂，自己也盆满钵满',
+        '你在工业发展、财政稳健与工人生活之间找到了微妙平衡：城市里既有井然有序的工厂与铁路，也有相对体面的住房和工时制度。工会虽然活跃，却更多通过谈判而非暴力对抗。你在卸任时既拥有不错的个人财富，又被后世评价为“少见的既不完全向资本低头、也没有被暴力革命吞噬的市长样本”。'
+    );
+}
+
+// 结局 6：平平无奇的任期
+function endingOrdinaryTerm(){
+    showEnding(
+        '结局：平稳任期 · 中规中矩',
+        '你的城市既未爆发大规模起义，也没有成为传奇般的模范城市。工人时而抱怨，时而感恩；资本家时而赞许，时而咒骂。你在 1901 年前后悄然卸任，名字只在旧档案和一块略显灰尘的纪念牌上留下痕迹。'
+    );
+}
+
+// 结局 7：模棱两可的历史脚注
+function endingMediocre(){
+    showEnding(
+        '结局：历史脚注中的名字',
+        '你的决策时而推进改革，时而紧缩开支，留下了一串彼此矛盾的记录。后来的历史学家翻阅档案时，会争论你究竟是保守的、务实的，还是只是被时代裹挟的普通官僚。无论如何，你成为了维多利亚时代浩瀚史书中的一则脚注。'
+    );
+}
+
+/* 初始化城市状态与日志 */
+updateCityUI('维多利亚刚刚登基，你被任命为一座新兴工业城市的市长。蒸汽机、铁路与工厂正在改变整个社会结构。');
+
+/* 初始化其他模块 */
+updateSW(); updateCD(); renderTasks();
+</script>
+</body>
+</html>
